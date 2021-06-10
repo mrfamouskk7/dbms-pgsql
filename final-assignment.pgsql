@@ -62,11 +62,11 @@ CREATE FUNCTION public.borrow_returned() RETURNS trigger
     AS $$
 BEGIN
 	IF NEW.book_id IS NOT NULL THEN
-        UPDATE book_details set copies_left = copies_left -1 where id=NEW.book_id;
+        UPDATE book_details set copies_left = copies_left + 1 where id=NEW.book_id;
 		UPDATE member_details set books_borrowed = books_borrowed -1 where id=NEW.member_id;
 		IF NEW.borrowed_till < CURRENT_DATE THEN
 			UPDATE member_details set fine = (CURRENT_DATE - NEW.borrowed_till)*10 where id=NEW.member_id;
-			DELETE FROM borrower_details where id=NEW.member_id;
+			DELETE FROM borrower_details where member_id=NEW.member_id;
 		END IF;
     END IF;
 	RETURN NEW;
@@ -75,6 +75,24 @@ $$;
 
 
 ALTER FUNCTION public.borrow_returned() OWNER TO postgres;
+
+--
+-- Name: notify_fines(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.notify_fines() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  PERFORM pg_notify(
+    'Due Date Passed', NEW.member_id
+  );
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.notify_fines() OWNER TO postgres;
 
 SET default_tablespace = '';
 
@@ -150,9 +168,9 @@ ALTER TABLE public.member_details OWNER TO postgres;
 --
 
 COPY public.book_details (id, title, author, total_copies, copies_left, subject, publication_date, shelf_id, layer_no) FROM stdin;
-1	Book1	Author1	10	8	Physics	2020-05-05	1	1
-2	Book2	Author2	15	12	Art	2018-04-21	1	2
-3	Book3	Author2	17	17	Health	2020-05-05	1	2
+3	Book3	Author2	17	16	Health	2020-05-05	1	2
+1	Book1	Author1	10	9	Physics	2020-05-05	1	1
+2	Book2	Author2	15	14	Art	2018-04-21	1	2
 4	Book4	Author3	13	13	Craft	2012-07-10	1	4
 5	Book5	Author5	19	19	Engineering	2010-07-15	1	5
 \.
@@ -163,10 +181,9 @@ COPY public.book_details (id, title, author, total_copies, copies_left, subject,
 --
 
 COPY public.borrower_details (borrowed_from, borrowed_till, book_id, member_id, status) FROM stdin;
-2021-03-07	2021-05-07	1	2	Pending
+2021-05-07	2021-06-17	3	2	Pending
 2021-03-07	2021-05-07	1	3	Pending
-2021-05-07	2021-06-17	2	3	Returned
-2021-05-07	2021-06-17	2	3	Returned
+2021-05-07	2021-06-17	2	3	Pending
 \.
 
 
@@ -175,9 +192,9 @@ COPY public.borrower_details (borrowed_from, borrowed_till, book_id, member_id, 
 --
 
 COPY public.member_details (id, name, contact, books_borrowed, fine) FROM stdin;
-1	mem1	7658251925	0	0
-2	mem2	7658251926	4	0
-3	mem3	7658251927	1	2780
+2	mem2	7658251926	1	0
+3	mem3	7658251927	2	0
+1	mem1	7658251925	0	340
 \.
 
 
@@ -230,5 +247,3 @@ ALTER TABLE ONLY public.borrower_details
 --
 -- PostgreSQL database dump complete
 --
-
-
