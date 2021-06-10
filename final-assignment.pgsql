@@ -94,6 +94,32 @@ $$;
 
 ALTER FUNCTION public.notify_fines() OWNER TO postgres;
 
+--
+-- Name: reserve_book(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.reserve_book(book_id integer, member_id integer) RETURNS character varying
+    LANGUAGE plpgsql
+    AS $$
+declare
+   ans integer;
+begin
+  select id 
+  into ans
+  from book_details
+  where id=book_id AND copies_left<=0;
+  
+  if not found then
+     raise 'Book Already Available';
+  end if;
+  INSERT INTO reserve VALUES(book_id, member_id);
+  return 'Reserved';
+  
+end;$$;
+
+
+ALTER FUNCTION public.reserve_book(book_id integer, member_id integer) OWNER TO postgres;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -164,13 +190,25 @@ CREATE TABLE public.member_details (
 ALTER TABLE public.member_details OWNER TO postgres;
 
 --
+-- Name: reserve; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.reserve (
+    book_id integer,
+    member_id integer
+);
+
+
+ALTER TABLE public.reserve OWNER TO postgres;
+
+--
 -- Data for Name: book_details; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.book_details (id, title, author, total_copies, copies_left, subject, publication_date, shelf_id, layer_no) FROM stdin;
 3	Book3	Author2	17	16	Health	2020-05-05	1	2
-1	Book1	Author1	10	9	Physics	2020-05-05	1	1
 2	Book2	Author2	15	14	Art	2018-04-21	1	2
+1	Book1	Author1	10	0	Physics	2020-05-05	1	1
 4	Book4	Author3	13	13	Craft	2012-07-10	1	4
 5	Book5	Author5	19	19	Engineering	2010-07-15	1	5
 \.
@@ -195,6 +233,15 @@ COPY public.member_details (id, name, contact, books_borrowed, fine) FROM stdin;
 2	mem2	7658251926	1	0
 3	mem3	7658251927	2	0
 1	mem1	7658251925	0	340
+\.
+
+
+--
+-- Data for Name: reserve; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.reserve (book_id, member_id) FROM stdin;
+1	1
 \.
 
 
@@ -242,6 +289,22 @@ ALTER TABLE ONLY public.borrower_details
 
 ALTER TABLE ONLY public.borrower_details
     ADD CONSTRAINT member_id FOREIGN KEY (member_id) REFERENCES public.member_details(id);
+
+
+--
+-- Name: reserve reserve_book_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reserve
+    ADD CONSTRAINT reserve_book_id_fkey FOREIGN KEY (book_id) REFERENCES public.book_details(id);
+
+
+--
+-- Name: reserve reserve_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reserve
+    ADD CONSTRAINT reserve_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.member_details(id);
 
 
 --
